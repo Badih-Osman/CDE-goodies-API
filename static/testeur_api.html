@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Testeur de l'API des objets du CDE</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+      }
+
+      .mise-en-page {
+        display: flex;
+        height: 100%;
+      }
+
+      .panneau-gauche {
+        width: 50%;
+        overflow-y: auto;
+        padding: 0 15px 15px 15px;
+        box-sizing: border-box;
+        border-right: 1px solid gray;
+      }
+
+      .panneau-droit {
+        width: 50%;
+        display: flex;
+        flex-direction: column;
+        padding: 0 15px 15px 15px;
+        box-sizing: border-box;
+      }
+
+      fieldset {
+        margin-bottom: 15px;
+      }
+
+      input {
+        margin: 3px 0;
+        padding: 4px;
+      }
+
+      button {
+        padding: 5px 12px;
+        margin-top: 5px;
+      }
+
+      pre {
+        flex: 1;
+        min-height: 0;
+        margin: 0;
+        overflow: auto;
+        border: 1px solid gray;
+        padding: 10px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mise-en-page">
+      <div class="panneau-gauche">
+        <h1>Testeur de l'API des objets du CDE</h1>
+
+        <fieldset>
+          <legend>Authentification (necessaire pour POST, PATCH et DELETE)</legend>
+          <label
+            >Cle API :
+            <input type="text" id="cle-api" value="osman" /></label
+          ><br />
+          <label
+            ><input type="checkbox" id="utiliser-cle" checked /> Envoyer la cle API
+            (decochez pour tester l'erreur 401)</label
+          >
+        </fieldset>
+
+        <fieldset>
+          <legend>GET /api/objets</legend>
+          <button onclick="listerObjets()">Lister tous les objets</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>GET /api/objets/:id</legend>
+          <label>Identifiant : <input type="text" id="identifiant-obtenir" value="1" size="5" /></label
+          ><br />
+          <button onclick="obtenirObjet()">Obtenir l'objet</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>POST /api/objets</legend>
+          <label>Nom : <input type="text" id="post-nom" value="Mug" /></label
+          ><br />
+          <label
+            >Prix (centimes) :
+            <input type="text" id="post-prix" value="600" /></label
+          ><br />
+          <label>Photo : <input type="text" id="post-photo" /></label><br />
+          <label
+            >Club : <input type="text" id="post-club" value="Club DIY" /></label
+          ><br />
+          <small>Les champs vides ne sont pas envoyes.</small><br />
+          <button onclick="creerObjet()">Creer un objet</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>PATCH /api/objets/:id</legend>
+          <label
+            >Identifiant : <input type="text" id="patch-identifiant" value="4" size="5" /></label
+          ><br />
+          <label>Nom : <input type="text" id="patch-nom" /></label><br />
+          <label
+            >Prix (centimes) :
+            <input type="text" id="patch-prix" value="700" /></label
+          ><br />
+          <label>Photo : <input type="text" id="patch-photo" /></label><br />
+          <label>Club : <input type="text" id="patch-club" /></label><br />
+          <small>Les champs vides ne sont pas envoyes.</small><br />
+          <button onclick="modifierObjet()">Modifier l'objet</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>DELETE /api/objets/:id</legend>
+          <label
+            >Identifiant : <input type="text" id="delete-identifiant" value="4" size="5" /></label
+          ><br />
+          <button onclick="supprimerObjet()">Supprimer l'objet</button>
+        </fieldset>
+      </div>
+
+      <div class="panneau-droit">
+        <h2>Reponse</h2>
+        <pre id="sortie">Cliquez sur un bouton pour envoyer une requete.</pre>
+      </div>
+    </div>
+
+    <script>
+      async function envoyerRequete(methode, url, corps) {
+        const sortie = document.getElementById("sortie");
+        const entetes = {};
+        const options = { method: methode, headers: entetes };
+
+        if (corps !== null) {
+          entetes["Content-Type"] = "application/json";
+          options.body = JSON.stringify(corps);
+        }
+
+        if (document.getElementById("utiliser-cle").checked) {
+          entetes["X-Cle-API"] = document.getElementById("cle-api").value;
+        }
+
+        let requete = methode + " " + url;
+        if (corps !== null) {
+          requete += "\nCorps : " + JSON.stringify(corps);
+        }
+        sortie.textContent = requete + "\n\nEnvoi en cours...";
+
+        try {
+          const reponse = await fetch(url, options);
+          const texte = await reponse.text();
+
+          let contenuReponse = "(aucun contenu)";
+          if (texte !== "") {
+            try {
+              contenuReponse = JSON.stringify(JSON.parse(texte), null, 2);
+            } catch (erreur) {
+              contenuReponse = texte; // Si ce n'est pas du JSON, l'afficher tel quel.
+            }
+          }
+
+          sortie.textContent =
+            requete +
+            "\n\nStatut : " +
+            reponse.status +
+            " " +
+            reponse.statusText +
+            "\n\n" +
+            contenuReponse;
+        } catch (erreur) {
+          sortie.textContent =
+            requete +
+            "\n\nErreur : " +
+            erreur.message +
+            "\nLe serveur est-il en cours d'execution ?";
+        }
+      }
+      function lireChamps(prefixe) {
+        const corps = {};
+        const champs = ["nom", "photo", "prix", "club"];
+
+        for (const champ of champs) {
+          const texte = document.getElementById(prefixe + "-" + champ).value;
+          if (texte !== "") {
+            if (champ === "prix" && !isNaN(texte)) {
+              corps[champ] = Number(texte); // Le prix est envoye sous forme de nombre.
+            } else {
+              corps[champ] = texte;
+            }
+          }
+        }
+        return corps;
+      }
+
+      function listerObjets() {
+        envoyerRequete("GET", "/api/objets", null);
+      }
+
+      function obtenirObjet() {
+        const identifiant = document.getElementById("identifiant-obtenir").value;
+        envoyerRequete("GET", "/api/objets/" + identifiant, null);
+      }
+
+      function creerObjet() {
+        envoyerRequete("POST", "/api/objets", lireChamps("post"));
+      }
+
+      function modifierObjet() {
+        const identifiant = document.getElementById("patch-identifiant").value;
+        envoyerRequete("PATCH", "/api/objets/" + identifiant, lireChamps("patch"));
+      }
+
+      function supprimerObjet() {
+        const identifiant = document.getElementById("delete-identifiant").value;
+        envoyerRequete("DELETE", "/api/objets/" + identifiant, null);
+      }
+    </script>
+  </body>
+</html>
